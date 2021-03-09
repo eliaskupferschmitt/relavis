@@ -2,7 +2,7 @@
     <div class="bg-light border-right" id="sidebar-wrapper">
       <div class="sidebar-heading">relavis</div>
       <div class="list-group list-group-flush">
-        <button class="list-group-item list-group-item-action bg-light" :key="i" v-for="(c, i) in content" @click="c.action()">{{c.title}}</button>
+        <button class="list-group-item list-group-item-action bg-light" :key="i" v-for="(c, i) in sidebar" @click="setActiveComponent(i)">{{c}}</button>
       </div>
     </div>
 </template>
@@ -10,31 +10,24 @@
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component'
 
-class SidebarObject {
-  readonly title: string
-  readonly action: Function
-
-  constructor (title: string, action?: Function) {
-    this.title = title
-    this.action = action !== undefined ? action : () => {
-      console.log(`triggered default action for ${title}`)
-    }
-  }
-}
-
 @Options({
+  methods: {
+    setActiveComponent (n: number) {
+      this.$store.commit('setActiveComponent', { n: n })
+    }
+  },
   props: {
   }
 })
 export default class SidebarComponent extends Vue {
   data () {
     return {
-      content: [
-        new SidebarObject('Lorem', () => alert('This is an example action!')),
-        new SidebarObject('Ipsum'),
-        new SidebarObject('dolor'),
-        new SidebarObject('sit'),
-        new SidebarObject('amet')
+      sidebar: [
+        'Search results',
+        'Family tree',
+        'Nothing',
+        'Nothing',
+        'Nothing'
       ]
     }
   }
