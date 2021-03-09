@@ -3,7 +3,9 @@
     <SidebarComponent/>
     <div id="page-content-wrapper">
       <HeaderComponent/>
-      <ContentComponent/>
+      <ContentComponent v-if="getActiveComponent === 0"/>
+      <VisualiserComponent v-else-if="getActiveComponent === 1"/>
+      <p v-else>There be dragons</p>
     </div>
   </div>
 </template>
@@ -13,12 +15,19 @@ import { Options, Vue } from 'vue-class-component'
 import SidebarComponent from './components/SidebarComponent.vue'
 import HeaderComponent from './components/HeaderComponent.vue'
 import ContentComponent from './components/ContentComponent.vue'
+import VisualiserComponent from '@/components/VisualiserComponent.vue'
 
 @Options({
   components: {
     SidebarComponent: SidebarComponent,
     HeaderComponent: HeaderComponent,
-    ContentComponent: ContentComponent
+    ContentComponent: ContentComponent,
+    VisualiserComponent: VisualiserComponent
+  },
+  computed: {
+    getActiveComponent () {
+      return this.$store.getters.activeComponent
+    }
   }
 })
 export default class App extends Vue {}
