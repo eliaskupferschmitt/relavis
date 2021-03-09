@@ -4,8 +4,8 @@ import { auth, driver, session as sessions } from 'neo4j-driver'
 export default createStore({
   state: {
     driver: driver(
-      'neo4j://localhost',
-      auth.basic('neo4j', 'relavis')
+      'neo4j://datascience.mni.thm.de',
+      auth.basic('gruppe09', 'gruppe09')
     ),
     tableHeader: ['Name', 'Family name', 'Born', 'Died', 'Age'],
     table: [['']],
@@ -15,7 +15,8 @@ export default createStore({
     search (state, payload) {
       state.tableReady = false
       const session = state.driver.session({
-        defaultAccessMode: sessions.READ
+        defaultAccessMode: sessions.READ,
+        database: 'genealogy'
       })
       session
         .run('MATCH (n: Person) WHERE n.name =~ $name RETURN * ORDER BY n.name;', {
