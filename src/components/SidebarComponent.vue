@@ -25,7 +25,7 @@ export default class SidebarComponent extends Vue {
       sidebar: [
         'Search results',
         'Family tree',
-        'Nothing',
+        'Debug',
         'Nothing',
         'Nothing'
       ]

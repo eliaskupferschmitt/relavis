@@ -4,6 +4,7 @@ import { auth, driver, session as sessions } from 'neo4j-driver'
 export default createStore({
   state: {
     activeComponent: 0,
+    debugData: { },
     driver: driver(
       'neo4j://datascience.mni.thm.de',
       auth.basic('gruppe09', 'gruppe09')
@@ -26,6 +27,7 @@ export default createStore({
           name: `(?i).*${payload.name}.*` // TODO prevent input containing regex from crashing query
         })
         .then(result => {
+          state.debugData = result.records
           state.table = []
           result.records.forEach(record => {
             const person = record.get('n').properties
@@ -54,6 +56,7 @@ export default createStore({
           name: `(?i).*${payload.name}.*` // TODO prevent input containing regex from crashing query
         })
         .then(result => {
+          state.debugData = result.records
           state.table = []
           result.records.forEach(record => {
             const personN = record.get('n').properties
@@ -97,11 +100,14 @@ export default createStore({
     activeComponent (state): number {
       return state.activeComponent
     },
-    tableHeader (state) {
-      return state.tableHeader
+    debugData (state) {
+      return state.debugData
     },
     table (state) {
       return state.table
+    },
+    tableHeader (state) {
+      return state.tableHeader
     },
     tableInit (state) {
       return state.tableInit
