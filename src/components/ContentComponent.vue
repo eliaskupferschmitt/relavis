@@ -12,7 +12,7 @@
       </tr>
       </tbody>
     </table>
-    <h1 class="mt-4" v-else>Searching database...</h1>
+    <h1 class="mt-4" v-else-if="tableInit">Searching database...</h1>
   </div>
 </template>
 
@@ -26,6 +26,9 @@ import { Options, Vue } from 'vue-class-component'
     },
     table () {
       return this.$store.getters.table
+    },
+    tableInit () {
+      return this.$store.getters.tableInit
     },
     tableReady () {
       return this.$store.getters.tableReady
