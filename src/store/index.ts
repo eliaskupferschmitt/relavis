@@ -10,11 +10,13 @@ export default createStore({
     ),
     tableHeader: ['Name', 'Family name', 'Born', 'Died', 'Age'],
     table: [['']],
+    tableInit: false,
     tableReady: false
   },
   mutations: {
     search (state, payload) {
       state.tableReady = false
+      state.tableInit = true
       const session = state.driver.session({
         defaultAccessMode: sessions.READ,
         database: 'genealogy'
@@ -42,6 +44,7 @@ export default createStore({
     },
     visualSearch (state, payload) {
       state.tableReady = false
+      state.tableInit = true
       const session = state.driver.session({
         defaultAccessMode: sessions.READ,
         database: 'genealogy'
@@ -99,6 +102,9 @@ export default createStore({
     },
     table (state) {
       return state.table
+    },
+    tableInit (state) {
+      return state.tableInit
     },
     tableReady (state) {
       return state.tableReady
