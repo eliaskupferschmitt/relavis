@@ -1,9 +1,5 @@
 # relavis
 
-## Prerequisites
-This app expects a local neo4j database with APOC support (password: **relavis**).  
-The file **all.cypher** should be executed to fill the database.
-
 ## Project setup
 ```
 npm install
