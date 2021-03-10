@@ -1,6 +1,7 @@
 <template>
   <div class="container-fluid">
     <vue-json-pretty :data="debugData" :deep="deep" :showLength="showLength"/>
+    <vue-json-pretty :data="persons" :deep="deep" :showLength="showLength"/>
   </div>
 </template>
 
@@ -16,6 +17,9 @@ import 'vue-json-pretty/lib/styles.css'
   computed: {
     debugData () {
       return this.$store.getters.debugData
+    },
+    persons () {
+      return this.$store.getters.persons
     }
   }
 })

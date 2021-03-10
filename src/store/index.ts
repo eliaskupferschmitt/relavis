@@ -1,5 +1,6 @@
 import { createStore } from 'vuex'
 import { auth, driver, session as sessions } from 'neo4j-driver'
+import { Person } from '@/typescript/Person'
 
 export default createStore({
   state: {
@@ -9,6 +10,7 @@ export default createStore({
       'neo4j://datascience.mni.thm.de',
       auth.basic('gruppe09', 'gruppe09')
     ),
+    persons: new Map<string, Person>(),
     tableHeader: ['Name', 'Family name', 'Born', 'Died', 'Age'],
     table: [['']],
     tableInit: false,
@@ -23,20 +25,24 @@ export default createStore({
         database: 'genealogy'
       })
       session
-        .run('MATCH (n: Person) WHERE n.name =~ $name RETURN * ORDER BY n.name;', {
-          name: `(?i).*${payload.name}.*` // TODO prevent input containing regex from crashing query
-        })
+        .run(
+          'MATCH (n: Person) ' +
+          'WHERE n.name =~ $name ' +
+          'RETURN * ORDER BY ' +
+          'n.name;', {
+            name: `(?i).*${payload.name}.*` // TODO prevent input containing regex from crashing query
+          })
         .then(result => {
           state.debugData = result.records
           state.table = []
           result.records.forEach(record => {
-            const person = record.get('n').properties
+            const p = record.get('n').properties
             state.table.push([
-              person.name,
-              Object.prototype.hasOwnProperty.call(person, 'familyname') ? person.familyname : '',
-              Object.prototype.hasOwnProperty.call(person, 'yearOfBirth') ? person.yearOfBirth : '',
-              Object.prototype.hasOwnProperty.call(person, 'yearOfDeath') ? person.yearOfDeath : '',
-              Object.prototype.hasOwnProperty.call(person, 'age') ? person.age.low : ''
+              p.name,
+              Object.prototype.hasOwnProperty.call(p, 'familyname') ? p.familyname : '',
+              Object.prototype.hasOwnProperty.call(p, 'yearOfBirth') ? p.yearOfBirth : '',
+              Object.prototype.hasOwnProperty.call(p, 'yearOfDeath') ? p.yearOfDeath : '',
+              Object.prototype.hasOwnProperty.call(p, 'age') ? p.age.low : ''
             ])
           })
           state.tableReady = true
@@ -52,36 +58,54 @@ export default createStore({
         database: 'genealogy'
       })
       session
-        .run('MATCH (o: Person)-[:CHILD_OF]->(n: Person)-[:CHILD_OF]->(m: Person) WHERE n.name =~ $name RETURN * ORDER BY n.name;', {
-          name: `(?i).*${payload.name}.*` // TODO prevent input containing regex from crashing query
-        })
+        .run(
+          'MATCH (a: Person) ' +
+          'WHERE a.name =~ $name ' +
+          'OPTIONAL MATCH (b: Person)-[:SPOUSE]-(a) ' +
+          'OPTIONAL MATCH (c: Person)-[:CHILD_OF]-(a) ' +
+          'RETURN * ' +
+          'ORDER BY a.name;', {
+            name: `(?i).*${payload.name}.*` // TODO prevent input containing regex from crashing query
+          })
         .then(result => {
           state.debugData = result.records
           state.table = []
           result.records.forEach(record => {
-            const personN = record.get('n').properties
-            const personO = record.get('o').properties
-            const personM = record.get('m').properties
+            const personA = record.get('a').properties
+            const personB = record.get('b').properties
+            const personC = record.get('c').properties
+            const person = new Person(
+              personA.genID,
+              personA.name,
+              Object.prototype.hasOwnProperty.call(personA, 'familyname') ? personA.familyname : '',
+              Object.prototype.hasOwnProperty.call(personA, 'yearOfBirth') ? personA.yearOfBirth : NaN,
+              Object.prototype.hasOwnProperty.call(personA, 'yearOfDeath') ? personA.yearOfDeath : NaN,
+              Object.prototype.hasOwnProperty.call(personA, 'age') ? personA.age.low : NaN,
+              Object.prototype.hasOwnProperty.call(personA, 'level') ? personA.age.low : NaN
+            )
+            if (!state.persons.has(person.id)) {
+              state.persons.set(person.id, person)
+            }
             state.table.push([
-              personN.name,
-              Object.prototype.hasOwnProperty.call(personN, 'familyname') ? personN.familyname : '',
-              Object.prototype.hasOwnProperty.call(personN, 'yearOfBirth') ? personN.yearOfBirth : '',
-              Object.prototype.hasOwnProperty.call(personN, 'yearOfDeath') ? personN.yearOfDeath : '',
-              Object.prototype.hasOwnProperty.call(personN, 'age') ? personN.age.low : ''
+              personA.name,
+              Object.prototype.hasOwnProperty.call(personA, 'familyname') ? personA.familyname : '',
+              Object.prototype.hasOwnProperty.call(personA, 'yearOfBirth') ? personA.yearOfBirth : '',
+              Object.prototype.hasOwnProperty.call(personA, 'yearOfDeath') ? personA.yearOfDeath : '',
+              Object.prototype.hasOwnProperty.call(personA, 'age') ? personA.age.low : ''
             ],
             [
-              personO.name,
-              Object.prototype.hasOwnProperty.call(personO, 'familyname') ? personO.familyname : '',
-              Object.prototype.hasOwnProperty.call(personO, 'yearOfBirth') ? personO.yearOfBirth : '',
-              Object.prototype.hasOwnProperty.call(personO, 'yearOfDeath') ? personO.yearOfDeath : '',
-              Object.prototype.hasOwnProperty.call(personO, 'age') ? personO.age.low : ''
+              personB.name,
+              Object.prototype.hasOwnProperty.call(personB, 'familyname') ? personB.familyname : '',
+              Object.prototype.hasOwnProperty.call(personB, 'yearOfBirth') ? personB.yearOfBirth : '',
+              Object.prototype.hasOwnProperty.call(personB, 'yearOfDeath') ? personB.yearOfDeath : '',
+              Object.prototype.hasOwnProperty.call(personB, 'age') ? personB.age.low : ''
             ],
             [
-              personM.name,
-              Object.prototype.hasOwnProperty.call(personM, 'familyname') ? personM.familyname : '',
-              Object.prototype.hasOwnProperty.call(personM, 'yearOfBirth') ? personM.yearOfBirth : '',
-              Object.prototype.hasOwnProperty.call(personM, 'yearOfDeath') ? personM.yearOfDeath : '',
-              Object.prototype.hasOwnProperty.call(personM, 'age') ? personM.age.low : ''
+              personC.name,
+              Object.prototype.hasOwnProperty.call(personC, 'familyname') ? personC.familyname : '',
+              Object.prototype.hasOwnProperty.call(personC, 'yearOfBirth') ? personC.yearOfBirth : '',
+              Object.prototype.hasOwnProperty.call(personC, 'yearOfDeath') ? personC.yearOfDeath : '',
+              Object.prototype.hasOwnProperty.call(personC, 'age') ? personC.age.low : ''
             ]
             )
           })
@@ -102,6 +126,9 @@ export default createStore({
     },
     debugData (state) {
       return state.debugData
+    },
+    persons (state) {
+      return state.persons
     },
     table (state) {
       return state.table
