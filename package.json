@@ -11,6 +11,7 @@
     "bootstrap": "^4.6.0",
     "core-js": "^3.6.5",
     "neo4j-driver": "^4.2.2",
+    "vis-network": "^9.0.3",
     "vue": "^3.0.0",
     "vue-class-component": "^8.0.0-0",
     "vue-json-pretty": "^2.0.2",
