@@ -1,7 +1,6 @@
 <template>
   <div class="container-fluid">
     <vue-json-pretty :data="debugData" :deep="deep" :showLength="showLength"/>
-    <vue-json-pretty :data="persons" :deep="deep" :showLength="showLength"/>
   </div>
 </template>
 

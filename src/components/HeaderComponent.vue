@@ -5,7 +5,6 @@
         <label class="input-group">
           <input type="search" class="form-control rounded" placeholder="Search for person..." v-model="searchBar"/>
           <button type="button" class="btn btn-outline-primary" @click="search">Search</button>
-          <button type="button" class="btn btn-outline-primary" @click="visualSearch">Visual Search</button>
         </label>
       </li>
     </ul>
@@ -22,11 +21,6 @@ import { Options, Vue } from 'vue-class-component'
     search () {
       if (this.$data.searchBar.trim() !== '') {
         this.$store.commit('search', { name: this.$data.searchBar })
-      }
-    },
-    visualSearch () {
-      if (this.$data.searchBar.trim() !== '') {
-        this.$store.commit('visualSearch', { name: this.$data.searchBar })
       }
     }
   }

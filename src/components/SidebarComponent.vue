@@ -9,8 +9,14 @@
 
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component'
+import store from '../store'
 
 @Options({
+  computed: {
+    sidebar () {
+      return this.$store.getters.sidebar
+    }
+  },
   methods: {
     setActiveComponent (n: number) {
       this.$store.commit('setActiveComponent', { n: n })
@@ -20,15 +26,9 @@ import { Options, Vue } from 'vue-class-component'
   }
 })
 export default class SidebarComponent extends Vue {
-  data () {
-    return {
-      sidebar: [
-        'Search results',
-        'Family tree',
-        'Debug',
-        'Nothing',
-        'Nothing'
-      ]
+  mounted () {
+    if (process.env.NODE_ENV === 'development') {
+      store.commit('debugSidebar')
     }
   }
 }

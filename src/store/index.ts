@@ -1,6 +1,7 @@
 import { createStore } from 'vuex'
 import { auth, driver, session as sessions } from 'neo4j-driver'
-import { Person } from '@/typescript/Person'
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const vis = require('vis-network/dist/vis-network.min.js')
 
 export default createStore({
   state: {
@@ -10,11 +11,21 @@ export default createStore({
       'neo4j://datascience.mni.thm.de',
       auth.basic('gruppe09', 'gruppe09')
     ),
-    persons: new Map<string, Person>(),
-    tableHeader: ['Name', 'Family name', 'Born', 'Died', 'Age'],
+    heightSep: 200,
+    sidebar: [
+      'Search results',
+      'Family tree'
+    ],
+    tableHeader: ['ID', 'Name', 'Family name', 'Born', 'Died', 'Age'],
     table: [['']],
     tableInit: false,
-    tableReady: false
+    tableReady: false,
+    queried: new Set<string>(),
+    visData: {
+      nodes: new vis.DataSet([]),
+      edges: new vis.DataSet([])
+    },
+    widthSep: 200
   },
   mutations: {
     search (state, payload) {
@@ -38,6 +49,7 @@ export default createStore({
           result.records.forEach(record => {
             const p = record.get('n').properties
             state.table.push([
+              p.genID,
               p.name,
               Object.prototype.hasOwnProperty.call(p, 'familyname') ? p.familyname : '',
               Object.prototype.hasOwnProperty.call(p, 'yearOfBirth') ? p.yearOfBirth : '',
@@ -46,76 +58,115 @@ export default createStore({
             ])
           })
           state.tableReady = true
+          state.activeComponent = 0
         })
         .catch(error => console.error(error))
         .then(() => session.close())
     },
-    visualSearch (state, payload) {
-      state.tableReady = false
-      state.tableInit = true
+    select (state, payload) {
+      if (payload.reset) {
+        state.visData.nodes.clear()
+        state.visData.edges.clear()
+      }
+      if (state.queried.has(payload.id)) { return }
       const session = state.driver.session({
         defaultAccessMode: sessions.READ,
         database: 'genealogy'
       })
       session
         .run(
-          'MATCH (a: Person) ' +
-          'WHERE a.name =~ $name ' +
-          'OPTIONAL MATCH (b: Person)-[:SPOUSE]-(a) ' +
-          'OPTIONAL MATCH (c: Person)-[:CHILD_OF]-(a) ' +
-          'RETURN * ' +
-          'ORDER BY a.name;', {
-            name: `(?i).*${payload.name}.*` // TODO prevent input containing regex from crashing query
+          'MATCH (p1: Person)-[r]->(p2: Person) ' +
+          'WHERE p1.genID = $id ' +
+          'OR p2.genID = $id ' +
+          'RETURN p1, p2, type(r) AS type, p1.genID = $id AS isP1;', {
+            id: payload.id
           })
         .then(result => {
-          state.debugData = result.records
-          state.table = []
-          result.records.forEach(record => {
-            const personA = record.get('a').properties
-            const personB = record.get('b').properties
-            const personC = record.get('c').properties
-            const person = new Person(
-              personA.genID,
-              personA.name,
-              Object.prototype.hasOwnProperty.call(personA, 'familyname') ? personA.familyname : '',
-              Object.prototype.hasOwnProperty.call(personA, 'yearOfBirth') ? personA.yearOfBirth : NaN,
-              Object.prototype.hasOwnProperty.call(personA, 'yearOfDeath') ? personA.yearOfDeath : NaN,
-              Object.prototype.hasOwnProperty.call(personA, 'age') ? personA.age.low : NaN,
-              Object.prototype.hasOwnProperty.call(personA, 'level') ? personA.age.low : NaN
-            )
-            if (!state.persons.has(person.id)) {
-              state.persons.set(person.id, person)
-            }
-            state.table.push([
-              personA.name,
-              Object.prototype.hasOwnProperty.call(personA, 'familyname') ? personA.familyname : '',
-              Object.prototype.hasOwnProperty.call(personA, 'yearOfBirth') ? personA.yearOfBirth : '',
-              Object.prototype.hasOwnProperty.call(personA, 'yearOfDeath') ? personA.yearOfDeath : '',
-              Object.prototype.hasOwnProperty.call(personA, 'age') ? personA.age.low : ''
-            ],
-            [
-              personB.name,
-              Object.prototype.hasOwnProperty.call(personB, 'familyname') ? personB.familyname : '',
-              Object.prototype.hasOwnProperty.call(personB, 'yearOfBirth') ? personB.yearOfBirth : '',
-              Object.prototype.hasOwnProperty.call(personB, 'yearOfDeath') ? personB.yearOfDeath : '',
-              Object.prototype.hasOwnProperty.call(personB, 'age') ? personB.age.low : ''
-            ],
-            [
-              personC.name,
-              Object.prototype.hasOwnProperty.call(personC, 'familyname') ? personC.familyname : '',
-              Object.prototype.hasOwnProperty.call(personC, 'yearOfBirth') ? personC.yearOfBirth : '',
-              Object.prototype.hasOwnProperty.call(personC, 'yearOfDeath') ? personC.yearOfDeath : '',
-              Object.prototype.hasOwnProperty.call(personC, 'age') ? personC.age.low : ''
-            ]
-            )
-          })
-          state.tableReady = true
+          state.debugData = result
+          const nodes = state.visData.nodes
+          const edges = state.visData.edges
+          const visNode = state.visData.nodes.get(payload.id)
+          const heightLevel = visNode ? visNode.level : 1
+          const heightSpacer = 200
+          const widthSpacer = 200
+          let nextParentX = -widthSpacer
+          let nextPersonX = -widthSpacer
+          let nextChildrenX = -widthSpacer
+          result.records
+            .forEach(record => {
+              const p1 = record.get('p1').properties
+              const p2 = record.get('p2').properties
+              const type: string = record.get('type')
+              const isP1: boolean = record.get('isP1')
+              const id1: string = p1.genID
+              const id2: string = p2.genID
+              if (isP1) {
+                state.queried.add(id1)
+              } else {
+                state.queried.add(id2)
+              }
+              if (!nodes.get(id1)) {
+                nodes.add({
+                  id: id1,
+                  label: p1.name,
+                  x: type === 'SPOUSE' || isP1 ? (nextPersonX += widthSpacer) : (nextParentX += widthSpacer),
+                  y: type === 'SPOUSE' || isP1 ? heightLevel * heightSpacer : heightLevel * heightSpacer + heightSpacer,
+                  level: type === 'SPOUSE' || isP1 ? heightLevel : heightLevel + 1,
+                  groups: isP1 ? 'satisfied' : 'unsatisfied'
+                })
+              }
+              if (!nodes.get(id2)) {
+                nodes.add({
+                  id: id2,
+                  label: p2.name,
+                  x: type === 'SPOUSE' || !isP1 ? (nextPersonX += widthSpacer) : (nextChildrenX += widthSpacer),
+                  y: type === 'SPOUSE' || !isP1 ? heightLevel * heightSpacer : heightLevel * heightSpacer - heightSpacer,
+                  level: type === 'SPOUSE' || !isP1 ? heightLevel : heightLevel - 1,
+                  groups: !isP1 ? 'satisfied' : 'unsatisfied'
+                })
+              }
+              if (type === 'SPOUSE' && !edges.get(id1 + 's' + id2) && isP1) {
+                edges.add({
+                  id: id1 + 's' + id2,
+                  from: id1,
+                  to: id2,
+                  color: 'green'
+                })
+              } else if (type === 'CHILD_OF' && !edges.get(id2 + 'c' + id1) && isP1) {
+                edges.add({
+                  id: id2 + 'c' + id1,
+                  from: id2,
+                  to: id1,
+                  color: 'red'
+                })
+              } else if (type === 'SPOUSE' && !edges.get(id1 + 's' + id2)) {
+                edges.add({
+                  id: id1 + 's' + id2,
+                  from: id1,
+                  to: id2,
+                  color: 'green'
+                })
+              } else if (type === 'CHILD_OF' && !edges.get(id2 + 'c' + id1)) {
+                edges.add({
+                  id: id2 + 'c' + id1,
+                  from: id2,
+                  to: id1,
+                  color: 'blue'
+                })
+              }
+            })
+          state.activeComponent = 1
         })
         .catch(error => console.error(error))
         .then(() => session.close())
     },
     setActiveComponent (state, payload) {
       state.activeComponent = payload.n
+    },
+    debugSidebar (state) {
+      if (!state.sidebar.includes('Debug')) {
+        state.sidebar.push('Debug')
+      }
     }
   },
   actions: {},
@@ -127,8 +178,8 @@ export default createStore({
     debugData (state) {
       return state.debugData
     },
-    persons (state) {
-      return state.persons
+    sidebar (state) {
+      return state.sidebar
     },
     table (state) {
       return state.table
@@ -141,6 +192,9 @@ export default createStore({
     },
     tableReady (state) {
       return state.tableReady
+    },
+    visData (state) {
+      return state.visData
     }
   }
 })

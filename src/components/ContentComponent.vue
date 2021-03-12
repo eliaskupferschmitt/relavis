@@ -7,7 +7,7 @@
       </tr>
       </thead>
       <tbody>
-      <tr v-for="(c1, i) in table" :key="i">
+      <tr v-for="(c1, i) in table" :key="i" @click="select(c1)">
         <td v-for="(c2, j) in c1" :key="j">{{c2}}</td>
       </tr>
       </tbody>
@@ -32,6 +32,11 @@ import { Options, Vue } from 'vue-class-component'
     },
     tableReady () {
       return this.$store.getters.tableReady
+    }
+  },
+  methods: {
+    select (node: any) {
+      this.$store.commit('select', { id: node[0], reset: true })
     }
   },
   props: {
