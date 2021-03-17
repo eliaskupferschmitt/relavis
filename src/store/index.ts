@@ -1,5 +1,6 @@
 import { createStore } from 'vuex'
 import { auth, driver, session as sessions } from 'neo4j-driver'
+import { url, username, password, database } from '../../database.json'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const vis = require('vis-network/dist/vis-network.min.js')
 
@@ -8,8 +9,8 @@ export default createStore({
     activeComponent: 0,
     debugData: { },
     driver: driver(
-      'neo4j://datascience.mni.thm.de',
-      auth.basic('gruppe09', 'gruppe09')
+      url,
+      auth.basic(username, password)
     ),
     heightSep: 200,
     sidebar: [
@@ -33,7 +34,7 @@ export default createStore({
       state.tableInit = true
       const session = state.driver.session({
         defaultAccessMode: sessions.READ,
-        database: 'genealogy'
+        database: database
       })
       session
         .run(
@@ -71,7 +72,7 @@ export default createStore({
       if (state.queried.has(payload.id)) { return }
       const session = state.driver.session({
         defaultAccessMode: sessions.READ,
-        database: 'genealogy'
+        database: database
       })
       session
         .run(

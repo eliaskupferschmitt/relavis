@@ -1,0 +1,6 @@
+{
+  "url": "neo4j://datascience.mni.thm.de",
+  "username": "gruppe09",
+  "password": "gruppe09",
+  "database": "genealogy"
+}

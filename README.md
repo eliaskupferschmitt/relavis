@@ -5,6 +5,9 @@
 npm install
 ```
 
+### Set-up databse
+Edit **database.json** to set-up database access.
+
 ### Compiles and hot-reloads for development
 ```
 npm run serve
