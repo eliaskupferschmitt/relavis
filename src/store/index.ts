@@ -1,8 +1,66 @@
 import { createStore } from 'vuex'
 import { auth, driver, session as sessions } from 'neo4j-driver'
 import { url, username, password, database } from '../../database.json'
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const vis = require('vis-network/dist/vis-network.min.js')
+import { DataSet } from 'vis-data'
+
+class NoMissingLinks extends Error {
+}
+
+interface Edge {
+  arrows: string;
+  color: string;
+  from: string;
+  id: string;
+  label: string;
+  to: string;
+}
+
+interface Node {
+  id: string;
+  label: string;
+  level: number;
+  x: number;
+  y: number;
+}
+
+function addConnection (from: string, to: string, type: string, edges: DataSet<Edge>) {
+  switch (type) {
+    case 'CHILD_OF': {
+      const id = from + 'c' + to
+      if (edges.get(id)) { return }
+      edges.add({
+        arrows: 'to',
+        color: 'red',
+        from: from,
+        id: id,
+        label: 'child of',
+        to: to
+      }, id)
+      break
+    }
+    case 'SPOUSE': {
+      const id = from + 's' + to
+      const idR = to + 's' + from
+      if (edges.get(id)) { return }
+      const edge = edges.get(idR)
+      if (edge) {
+        edges.remove(edge.id)
+        edge.arrows = 'from, to'
+        edges.add(edge, id)
+      } else {
+        edges.add({
+          arrows: 'to',
+          color: 'green',
+          from: from,
+          id: id,
+          label: 'spouse',
+          to: to
+        }, id)
+      }
+      break
+    }
+  }
+}
 
 export default createStore({
   state: {
@@ -13,6 +71,7 @@ export default createStore({
       auth.basic(username, password)
     ),
     heightSep: 200,
+    linked: new Set<string>(),
     sidebar: [
       'Search results',
       'Family tree'
@@ -23,8 +82,8 @@ export default createStore({
     tableReady: false,
     queried: new Set<string>(),
     visData: {
-      nodes: new vis.DataSet([]),
-      edges: new vis.DataSet([])
+      nodes: new DataSet<Node, 'id'>([]),
+      edges: new DataSet<Edge, 'id'>([])
     },
     widthSep: 200
   },
@@ -78,8 +137,7 @@ export default createStore({
         .run(
           'MATCH (p1: Person)-[r]->(p2: Person) ' +
           'WHERE p1.genID = $id ' +
-          'OR p2.genID = $id ' +
-          'RETURN p1, p2, type(r) AS type, p1.genID = $id AS isP1;', {
+          'RETURN p1, p2, type(r) AS type;', {
             id: payload.id
           })
         .then(result => {
@@ -87,10 +145,9 @@ export default createStore({
           const nodes = state.visData.nodes
           const edges = state.visData.edges
           const visNode = state.visData.nodes.get(payload.id)
-          const heightLevel = visNode ? visNode.level : 1
+          const heightLevel = visNode ? Array.isArray(visNode) ? visNode[0].level : (visNode as { level: number }).level : 1
           const heightSpacer = 200
           const widthSpacer = 200
-          let nextParentX = -widthSpacer
           let nextPersonX = -widthSpacer
           let nextChildrenX = -widthSpacer
           result.records
@@ -98,67 +155,111 @@ export default createStore({
               const p1 = record.get('p1').properties
               const p2 = record.get('p2').properties
               const type: string = record.get('type')
-              const isP1: boolean = record.get('isP1')
               const id1: string = p1.genID
               const id2: string = p2.genID
-              if (isP1) {
-                state.queried.add(id1)
-              } else {
-                state.queried.add(id2)
-              }
+              state.linked.add(id1)
+              state.queried.add(id1)
               if (!nodes.get(id1)) {
                 nodes.add({
                   id: id1,
                   label: p1.name,
-                  x: type === 'SPOUSE' || isP1 ? (nextPersonX += widthSpacer) : (nextParentX += widthSpacer),
-                  y: type === 'SPOUSE' || isP1 ? heightLevel * heightSpacer : heightLevel * heightSpacer + heightSpacer,
-                  level: type === 'SPOUSE' || isP1 ? heightLevel : heightLevel + 1,
-                  groups: isP1 ? 'satisfied' : 'unsatisfied'
-                })
+                  x: (nextPersonX += widthSpacer),
+                  y: heightLevel * heightSpacer,
+                  level: heightLevel
+                }, id1)
               }
               if (!nodes.get(id2)) {
                 nodes.add({
                   id: id2,
                   label: p2.name,
-                  x: type === 'SPOUSE' || !isP1 ? (nextPersonX += widthSpacer) : (nextChildrenX += widthSpacer),
-                  y: type === 'SPOUSE' || !isP1 ? heightLevel * heightSpacer : heightLevel * heightSpacer - heightSpacer,
-                  level: type === 'SPOUSE' || !isP1 ? heightLevel : heightLevel - 1,
-                  groups: !isP1 ? 'satisfied' : 'unsatisfied'
-                })
+                  x: type === 'SPOUSE' ? (nextPersonX += widthSpacer) : (nextChildrenX += widthSpacer),
+                  y: type === 'SPOUSE' ? heightLevel * heightSpacer : heightLevel * heightSpacer - heightSpacer,
+                  level: type === 'SPOUSE' ? heightLevel : heightLevel - 1
+                }, id2)
               }
-              if (type === 'SPOUSE' && !edges.get(id1 + 's' + id2) && isP1) {
-                edges.add({
-                  id: id1 + 's' + id2,
-                  from: id1,
-                  to: id2,
-                  color: 'green'
-                })
-              } else if (type === 'CHILD_OF' && !edges.get(id2 + 'c' + id1) && isP1) {
-                edges.add({
-                  id: id2 + 'c' + id1,
-                  from: id2,
-                  to: id1,
-                  color: 'red'
-                })
-              } else if (type === 'SPOUSE' && !edges.get(id1 + 's' + id2)) {
-                edges.add({
-                  id: id1 + 's' + id2,
-                  from: id1,
-                  to: id2,
-                  color: 'green'
-                })
-              } else if (type === 'CHILD_OF' && !edges.get(id2 + 'c' + id1)) {
-                edges.add({
-                  id: id2 + 'c' + id1,
-                  from: id2,
-                  to: id1,
-                  color: 'blue'
-                })
+              addConnection(id1, id2, type, edges)
+            })
+        })
+        .then(() => session.run(
+          'MATCH (p1: Person)<-[r]-(p2: Person) ' +
+          'WHERE p1.genID = $id ' +
+          'RETURN p1, p2, type(r) AS type;', {
+            id: payload.id
+          }))
+        .then(result => {
+          state.debugData = result
+          const nodes = state.visData.nodes
+          const edges = state.visData.edges
+          const visNode = state.visData.nodes.get(payload.id)
+          const heightLevel = visNode ? Array.isArray(visNode) ? visNode[0].level : (visNode as { level: number }).level : 1
+          const heightSpacer = 200
+          const widthSpacer = 200
+          let nextPersonX = -widthSpacer
+          let nextChildrenX = -widthSpacer
+          result.records
+            .forEach(record => {
+              const p1 = record.get('p1').properties
+              const p2 = record.get('p2').properties
+              const type: string = record.get('type')
+              const id1: string = p1.genID
+              const id2: string = p2.genID
+              if (!nodes.get(id2)) {
+                nodes.add({
+                  id: id2,
+                  label: p2.name,
+                  x: type === 'SPOUSE' ? (nextPersonX += widthSpacer) : (nextChildrenX += widthSpacer),
+                  y: type === 'SPOUSE' ? heightLevel * heightSpacer : heightLevel * heightSpacer + heightSpacer,
+                  level: type === 'SPOUSE' ? heightLevel : heightLevel + 1
+                }, id2)
               }
+              addConnection(id2, id1, type, edges)
             })
           state.activeComponent = 1
         })
-        .catch(error => console.error(error))
+        .then(() => {
+          const missingLinks = state.visData.nodes.get({
+            fields: ['id'],
+            filter: (node: {id: string}) => !state.queried.has(node.id) && !state.linked.has(node.id)
+          }).map((node: {id: string}) => `${node.id}`)
+          if (missingLinks.length === 0) { throw new NoMissingLinks() }
+          const query =
+            'MATCH (p1: Person)-[r]-(p2: Person) ' +
+            `WHERE ${missingLinks.map((id: string) => `p1.genID = "${id}"`).join(' OR ')} ` +
+            'RETURN DISTINCT p1, p2, startnode(r).genID as from, type(r) as type;'
+          missingLinks.forEach((id: string) => state.linked.add(id))
+          return session.run(query)
+        })
+        .then(result => {
+          const edges = state.visData.edges.get({
+            fields: ['id', 'from', 'to']
+          })
+          result.records
+            .filter(record => {
+              const p1 = record.get('p1').properties
+              const p2 = record.get('p2').properties
+              const from: string = record.get('from')
+              return !edges.some((edge: {id: string; from: string; to: string}) => (edge.from === from) && (edge.to === (from === p1 ? p2 : p1)))
+            })
+            .forEach(record => {
+              const p1 = record.get('p1').properties
+              const p2 = record.get('p2').properties
+              const id1: string = p1.genID
+              const id2: string = p2.genID
+              const type: string = record.get('type')
+              const isP1: boolean = record.get('from') === id1
+              const edges = state.visData.edges
+              if (isP1) {
+                addConnection(id1, id2, type, edges)
+              } else {
+                addConnection(id2, id1, type, edges)
+              }
+            })
+        })
+        .catch(error => {
+          if (!(error instanceof NoMissingLinks)) {
+            console.error(error)
+          }
+        })
         .then(() => session.close())
     },
     setActiveComponent (state, payload) {

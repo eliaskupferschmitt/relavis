@@ -1,14 +1,13 @@
 <template>
   <div class="container-fluid">
-    <div id="mynetwork"></div>
+    <div id="visualiser" ref="visualiser"></div>
   </div>
 </template>
 
 <script lang="ts">
 import { Options, Vue } from 'vue-class-component'
 import store from '../store/'
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const vis = require('vis-network/dist/vis-network.min.js')
+import { Network } from 'vis-network'
 
 @Options({
   computed: {
@@ -32,12 +31,14 @@ export default class VisualiserComponent extends Vue {
     height: '100%',
     width: '100%',
     locale: 'en',
-    // locales: locales,
     clickToUse: false,
     edges: {
       arrows: 'to',
-      color: 'red',
-      font: '12px arial #ff0000',
+      font: {
+        align: 'top',
+        face: 'arial',
+        size: 12
+      },
       scaling: {
         label: true
       },
@@ -51,13 +52,6 @@ export default class VisualiserComponent extends Vue {
       },
       shape: 'box',
       widthConstraint: 100
-      /* color: '#ff0000',
-      fixed: false,
-      font: '12px arial red',
-      scaling: {
-        label: true
-      },
-      shadow: true */
     },
     interaction: {
       dragNodes: true,
@@ -92,13 +86,13 @@ export default class VisualiserComponent extends Vue {
     }
   }
 
-  container: HTMLElement | null = null
-  network = null
+  container: HTMLElement | undefined
+  network: Network | undefined
 
   mounted () {
-    this.container = document.getElementById('mynetwork')
-    const network = new vis.Network(this.container, store.state.visData, this.options)
-    network.on('selectNode', (properties: any) => {
+    this.container = this.$refs.visualiser as HTMLElement
+    const network = new Network(this.container, store.state.visData, this.options)
+    network.on('selectNode', (properties: { nodes: string[] }) => {
       store.commit('select', {
         id: properties.nodes[0]
       })
