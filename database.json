@@ -1,5 +1,5 @@
 {
-  "url": "bolt://jlu-buster.mni.thm.de:9100/",
+  "url": "bolt://jlu-buster.mni.thm.de:9101/",
   "username": "neo4j",
   "password": "1234",
   "database": ""
